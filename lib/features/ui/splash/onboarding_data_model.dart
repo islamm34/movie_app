@@ -17,28 +17,28 @@ class OnboardingModel {
 
   static List<OnboardingModel> datalist = [
     OnboardingModel(
-      image: AppAssets.MoviesPosters, // ضعي اسم الصورة المناسبة
+      image: AppAssets.MoviesPosters,
       title: "Find Your Next\nFavorite Movie Here",
       description:
           "Get access to a huge library of movies to suit all tastes. You will surely like it.",
       buttonText: "Explore Now",
     ),
     OnboardingModel(
-      image: AppAssets.xll, // ضعي اسم الصورة المناسبة
+      image: AppAssets.xll,
       title: "Discover Movies",
       description:
           "Explore a vast collection of movies in all genres and genres. Find your next favorite film with ease.",
       buttonText: "Next",
     ),
     OnboardingModel(
-      image: AppAssets.theGodfather1Png, // ضعي اسم الصورة المناسبة
+      image: AppAssets.theGodfather1Png,
       title: "Explore All Genres",
       description:
           "Discover movies from every genre, in all available qualities. Find something new and exciting to watch every day.",
       buttonText: "Next",
     ),
     OnboardingModel(
-      image: AppAssets.samMendesHollywoodWarFilmPng, // ضعي اسم الصورة المناسبة
+      image: AppAssets.samMendesHollywoodWarFilmPng,
       title: "Create Watchlists",
       description:
           "Save movies to your watchlist to keep track of what you want to watch next. Enjoy films in various quality tiers.",
