@@ -64,10 +64,10 @@ class AuthRepositoryImpl implements AuthRepository {
       final UserCredential userCredential = await _firebaseAuth
           .createUserWithEmailAndPassword(email: email, password: password);
 
-      // تحديث اسم المستخدم
+      // Update user name
       await userCredential.user?.updateDisplayName(name);
 
-      // حفظ معلومات إضافية في Firestore (اختياري)
+      // Save additional information in Firestore (optional)
       await _saveUserToFirestore(
         userId: userCredential.user!.uid,
         email: email,
@@ -75,7 +75,7 @@ class AuthRepositoryImpl implements AuthRepository {
         phone: phone,
       );
 
-      // إعادة تحميل المستخدم للحصول على أحدث البيانات
+      // Reload user to get latest data
       await userCredential.user?.reload();
       final updatedUser = _firebaseAuth.currentUser;
 
@@ -146,15 +146,15 @@ class AuthRepositoryImpl implements AuthRepository {
     );
   }
 
-  // حفظ بيانات المستخدم في Firestore (اختياري)
+  // Save user data in Firestore (optional)
   Future<void> _saveUserToFirestore({
     required String userId,
     required String email,
     required String name,
     required String phone,
   }) async {
-    // يمكنك إضافة Firebase Firestore هنا إذا أردت حفظ بيانات إضافية
-    // مثال:
+    // You can add Firebase Firestore here if you want to save additional data
+    // Example:
     // final FirebaseFirestore firestore = FirebaseFirestore.instance;
     // await firestore.collection('users').doc(userId).set({
     //   'email': email,

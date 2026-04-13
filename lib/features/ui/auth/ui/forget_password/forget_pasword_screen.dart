@@ -115,8 +115,8 @@ class ForgotPasswordScreen extends StatelessWidget {
                   height: 45,
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.pop(context); // إغلاق الـ Dialog
-                      Navigator.pop(context); // العودة إلى شاشة Login
+                      Navigator.pop(context); // Close the Dialog
+                      Navigator.pop(context); // Return to Login screen
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFF6BD00),

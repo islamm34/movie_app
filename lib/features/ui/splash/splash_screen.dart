@@ -13,7 +13,7 @@ class _SplashScreenState extends State<SplashScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  // دالة للحصول على الصورة حسب الصفحة الحالية من الـ Model
+  // Function to get the image based on the current page from the Model
   String _getBackgroundImage(int index) {
     return OnboardingModel.datalist[index].image;
   }
@@ -24,7 +24,7 @@ class _SplashScreenState extends State<SplashScreen> {
       backgroundColor: const Color(0xFF121312),
       body: Stack(
         children: [
-          // 1. الخلفية (الصور مالية الشاشة)
+          // 1. Background (full screen images)
           PageView.builder(
             controller: _pageController,
             onPageChanged: (index) => setState(() => _currentPage = index),
@@ -39,7 +39,7 @@ class _SplashScreenState extends State<SplashScreen> {
             },
           ),
 
-          // 2. تدريج أسود (Gradient) لضمان وضوح النص الأبيض فوق أي صورة
+          // 2. Black gradient to ensure white text clarity over any image
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -55,15 +55,15 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
           ),
 
-          // 3. المحتوى العائم (Floating Content) - نصوص وأزرار مباشرة على الصورة
+          // 3. Floating Content - texts and buttons directly on the image
           Positioned(
-            bottom: 50, // مسافة من الأسفل
+            bottom: 50, // Distance from bottom
             left: 24,
             right: 24,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // العنوان
+                // Title
                 Text(
                   OnboardingModel.datalist[_currentPage].title,
                   textAlign: TextAlign.center,
@@ -75,7 +75,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // الوصف (لو موجود وغير فارغ)
+                // Description (if exists and not empty)
                 if (OnboardingModel.datalist[_currentPage].description != null &&
                     OnboardingModel.datalist[_currentPage].description!.isNotEmpty)
                   Text(
@@ -89,13 +89,13 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                 const SizedBox(height: 40),
 
-                // الأزرار
+                // Buttons
                 _buildButtons(),
               ],
             ),
           ),
 
-          // كلمة OnBoarding في الأعلى
+          // OnBoarding word at the top
           Positioned(
             top: 50,
             left: 0,
@@ -115,22 +115,22 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 
-  // دالة بناء الأزرار مع الشروط المطلوبة
+  // Function to build buttons with required conditions
   Widget _buildButtons() {
     final bool isLastPage = _currentPage == OnboardingModel.datalist.length - 1;
-    // زر الباك يظهر فقط من الصفحة الثالثة (index 2)
+    // Back button appears only from the third page (index 2)
     final bool showBack = _currentPage >= 2;
 
     return Column(
       children: [
-        // زر الـ Next أو Finish
+        // Next or Finish button
         SizedBox(
           width: double.infinity,
           height: 55,
           child: ElevatedButton(
             onPressed: () {
               if (isLastPage) {
-                // الانتقال للصفحة الرئيسية عند الضغط على Finish
+                // Navigate to the main page when pressing Finish
 
                 Navigator.pushReplacementNamed(context, AppRoutes.login);
               } else {
@@ -141,7 +141,7 @@ class _SplashScreenState extends State<SplashScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFF6BD00), // اللون الأصفر
+              backgroundColor: const Color(0xFFF6BD00), // Yellow color
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               elevation: 0,
             ),
@@ -156,7 +156,7 @@ class _SplashScreenState extends State<SplashScreen> {
           ),
         ),
 
-        // زر الـ Back (يظهر فقط من index 2)
+        // Back button (appears only from index 2)
         if (showBack) ...[
           const SizedBox(height: 12),
           SizedBox(

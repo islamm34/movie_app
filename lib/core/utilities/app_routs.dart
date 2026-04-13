@@ -19,6 +19,6 @@ class AppRoutes {
     login: (context) => const LoginScreen(),
     register: (context) => const RegisterScreen(),
     forgetPassword: (context) => const ForgotPasswordScreen(),
-    home: (context) => const HomeScreen(), // أضف هذا السطر
+    home: (context) => const HomeScreen(), // Add this line
   };
 }

@@ -17,7 +17,7 @@ class UserEntity {
     this.createdAt,
   });
 
-  // نسخة من الكائن مع تعديل بعض الحقول
+  // Copy of the object with some fields modified
   UserEntity copyWith({
     String? id,
     String? email,
@@ -36,7 +36,7 @@ class UserEntity {
     );
   }
 
-  // تحويل من JSON
+  // Convert from JSON
   factory UserEntity.fromJson(Map<String, dynamic> json) {
     return UserEntity(
       id: json['id'] as String,
@@ -50,7 +50,7 @@ class UserEntity {
     );
   }
 
-  // تحويل إلى JSON
+  // Convert to JSON
   Map<String, dynamic> toJson() {
     return {
       'id': id,

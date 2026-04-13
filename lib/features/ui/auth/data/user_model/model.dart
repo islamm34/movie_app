@@ -1,4 +1,3 @@
-
 // lib/data/auth/models/user_model.dart
 import '../../use_case/entities/user_entity.dart';
 
@@ -12,7 +11,7 @@ class UserModel extends UserEntity {
     super.createdAt,
   });
 
-  // تحويل من JSON (لـ Firestore)
+  // Convert from JSON (for Firestore)
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'] as String,
@@ -26,7 +25,7 @@ class UserModel extends UserEntity {
     );
   }
 
-  // تحويل إلى JSON (لـ Firestore)
+  // Convert to JSON (for Firestore)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -38,7 +37,7 @@ class UserModel extends UserEntity {
     };
   }
 
-  // تحويل من UserEntity
+  // Convert from UserEntity
   factory UserModel.fromEntity(UserEntity entity) {
     return UserModel(
       id: entity.id,

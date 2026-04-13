@@ -51,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       String errorMessage = e.toString().replaceAll('Exception:', '');
 
-      if (errorMessage.contains('تأكيد بريدك')) {
+      if (errorMessage.contains('Please verify your email first')) {
         _showNotVerifiedDialog();
       } else {
         if (mounted) {

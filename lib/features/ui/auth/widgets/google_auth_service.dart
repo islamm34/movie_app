@@ -10,26 +10,26 @@ class GoogleAuthService {
 
   Future<User?> signInWithGoogle() async {
     try {
-      // تهيئة GoogleSignIn
+      // Initialize GoogleSignIn
       GoogleSignIn googleSignIn = GoogleSignIn();
 
-      // تسجيل الدخول
+      // Sign in
       GoogleSignInAccount? googleUser = await googleSignIn.signIn();
 
       if (googleUser == null) {
         return null;
       }
 
-      // الحصول على معلومات المصادقة
+      // Get authentication information
       GoogleSignInAuthentication googleAuth = await googleUser.authentication;
 
-      // إنشاء بيانات اعتماد Firebase
+      // Create Firebase credentials
       AuthCredential credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // تسجيل الدخول إلى Firebase
+      // Sign in to Firebase
       UserCredential userCredential = await _auth.signInWithCredential(
         credential,
       );
@@ -62,7 +62,7 @@ class GoogleAuthService {
       String message = _getErrorMessage(e.code);
       throw Exception(message);
     } catch (e) {
-      throw Exception('حدث خطأ غير متوقع. حاول مرة أخرى.');
+      throw Exception('An unexpected error occurred. Try again.');
     }
   }
 
@@ -77,7 +77,7 @@ class GoogleAuthService {
           .signInWithEmailAndPassword(email: email, password: password);
 
       if (!userCredential.user!.emailVerified) {
-        throw Exception('يرجى تأكيد بريدك الإلكتروني أولاً. تحقق من صندوق الوارد الخاص بك.');
+        throw Exception('Please verify your email first. Check your inbox.');
       }
 
       return userCredential.user;
@@ -85,7 +85,7 @@ class GoogleAuthService {
       String message = _getErrorMessage(e.code);
       throw Exception(message);
     } catch (e) {
-      throw Exception('حدث خطأ غير متوقع. حاول مرة أخرى.');
+      throw Exception('An unexpected error occurred. Try again.');
     }
   }
 
@@ -99,7 +99,7 @@ class GoogleAuthService {
       if (!userCredential.user!.emailVerified) {
         await userCredential.user?.sendEmailVerification();
       } else {
-        throw Exception('بريدك الإلكتروني مفعل بالفعل');
+        throw Exception('Your email is already activated');
       }
 
       await _auth.signOut();
@@ -133,21 +133,21 @@ class GoogleAuthService {
   String _getErrorMessage(String code) {
     switch (code) {
       case 'email-already-in-use':
-        return 'هذا البريد الإلكتروني مستخدم بالفعل';
+        return 'This email is already in use';
       case 'invalid-email':
-        return 'البريد الإلكتروني غير صالح';
+        return 'Invalid email';
       case 'weak-password':
-        return 'كلمة المرور ضعيفة جداً (يجب أن تكون 6 أحرف على الأقل)';
+        return 'Password is too weak (must be at least 6 characters)';
       case 'user-not-found':
-        return 'المستخدم غير موجود';
+        return 'User not found';
       case 'wrong-password':
-        return 'كلمة المرور غير صحيحة';
+        return 'Wrong password';
       case 'too-many-requests':
-        return 'طلبات كثيرة جداً. حاول مرة أخرى لاحقاً';
+        return 'Too many requests. Try again later';
       case 'network-request-failed':
-        return 'خطأ في الشبكة. تحقق من اتصالك بالإنترنت';
+        return 'Network error. Check your internet connection';
       default:
-        return 'حدث خطأ. حاول مرة أخرى';
+        return 'An error occurred. Try again';
     }
   }
 
@@ -155,21 +155,21 @@ class GoogleAuthService {
 
   static String? validateEmail(String? email) {
     if (email == null || email.isEmpty) {
-      return 'البريد الإلكتروني مطلوب';
+      return 'Email is required';
     }
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
     if (!emailRegex.hasMatch(email)) {
-      return 'البريد الإلكتروني غير صالح';
+      return 'Invalid email';
     }
     return null;
   }
 
   static String? validatePassword(String? password) {
     if (password == null || password.isEmpty) {
-      return 'كلمة المرور مطلوبة';
+      return 'Password is required';
     }
     if (password.length < 6) {
-      return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+      return 'Password must be at least 6 characters';
     }
     return null;
   }
@@ -179,31 +179,31 @@ class GoogleAuthService {
       String? confirmPassword,
       ) {
     if (confirmPassword == null || confirmPassword.isEmpty) {
-      return 'تأكيد كلمة المرور مطلوب';
+      return 'Confirm password is required';
     }
     if (password != confirmPassword) {
-      return 'كلمة المرور غير متطابقة';
+      return 'Passwords do not match';
     }
     return null;
   }
 
   static String? validateName(String? name) {
     if (name == null || name.isEmpty) {
-      return 'الاسم مطلوب';
+      return 'Name is required';
     }
     if (name.length < 3) {
-      return 'الاسم يجب أن يكون 3 أحرف على الأقل';
+      return 'Name must be at least 3 characters';
     }
     return null;
   }
 
   static String? validatePhone(String? phone) {
     if (phone == null || phone.isEmpty) {
-      return 'رقم الهاتف مطلوب';
+      return 'Phone number is required';
     }
     final cleanPhone = phone.replaceAll(RegExp(r'[\s\-]'), '');
     if (cleanPhone.length < 10) {
-      return 'رقم الهاتف غير صالح';
+      return 'Invalid phone number';
     }
     return null;
   }

@@ -9,32 +9,32 @@ class AuthState {
 
   const AuthState({required this.status, this.user, this.errorMessage});
 
-  // الحالة الأولية
+  // Initial state
   factory AuthState.initial() {
     return const AuthState(status: AuthStatus.initial);
   }
 
-  // حالة التحميل
+  // Loading state
   factory AuthState.loading() {
     return const AuthState(status: AuthStatus.loading);
   }
 
-  // حالة تسجيل الدخول
+  // Login state
   factory AuthState.authenticated(UserEntity user) {
     return AuthState(status: AuthStatus.authenticated, user: user);
   }
 
-  // حالة عدم تسجيل الدخول
+  // Not logged in state
   factory AuthState.unauthenticated() {
     return const AuthState(status: AuthStatus.unauthenticated);
   }
 
-  // حالة الخطأ
+  // Error state
   factory AuthState.error(String message) {
     return AuthState(status: AuthStatus.error, errorMessage: message);
   }
 
-  // نسخة من الحالة
+  // Copy of the state
   AuthState copyWith({
     AuthStatus? status,
     UserEntity? user,

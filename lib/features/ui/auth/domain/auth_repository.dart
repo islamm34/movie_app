@@ -3,23 +3,23 @@
 import '../use_case/entities/user_entity.dart';
 
 abstract class AuthRepository {
-  // تسجيل الدخول
+  // Login
   Future<UserEntity?> loginWithEmail(String email, String password);
   Future<UserEntity?> loginWithGoogle();
 
-  // التسجيل
+  // Registration
   Future<UserEntity?> registerWithEmail(String email, String password, String name, String phone);
 
-  // تسجيل الخروج
+  // Logout
   Future<void> logout();
 
-  // التحقق من حالة المستخدم
+  // Check user status
   Stream<UserEntity?> get user;
   UserEntity? get currentUser;
 
-  // إعادة تعيين كلمة المرور
+  // Reset password
   Future<bool> resetPassword(String email);
 
-  // تحديث الملف الشخصي
+  // Update profile
   Future<UserEntity?> updateProfile({String? name, String? photoUrl});
 }
