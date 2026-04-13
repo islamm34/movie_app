@@ -1,7 +1,13 @@
 // lib/data/auth/models/user_model.dart
+
 import '../../use_case/entities/user_entity.dart';
 
 class UserModel extends UserEntity {
+  final String? fcmToken;
+  final DateTime? lastLoginAt;
+  final List<String>? favoriteMovies;
+  final List<String>? watchlist;
+
   const UserModel({
     required super.id,
     required super.email,
@@ -9,6 +15,10 @@ class UserModel extends UserEntity {
     super.phone,
     super.photoUrl,
     super.createdAt,
+    this.fcmToken,
+    this.lastLoginAt,
+    this.favoriteMovies,
+    this.watchlist,
   });
 
   // Convert from JSON (for Firestore)
@@ -22,6 +32,16 @@ class UserModel extends UserEntity {
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : null,
+      fcmToken: json['fcmToken'] as String?,
+      lastLoginAt: json['lastLoginAt'] != null
+          ? DateTime.parse(json['lastLoginAt'] as String)
+          : null,
+      favoriteMovies: json['favoriteMovies'] != null
+          ? List<String>.from(json['favoriteMovies'] as List)
+          : null,
+      watchlist: json['watchlist'] != null
+          ? List<String>.from(json['watchlist'] as List)
+          : null,
     );
   }
 
@@ -34,6 +54,10 @@ class UserModel extends UserEntity {
       'phone': phone,
       'photoUrl': photoUrl,
       'createdAt': createdAt?.toIso8601String(),
+      'fcmToken': fcmToken,
+      'lastLoginAt': lastLoginAt?.toIso8601String(),
+      'favoriteMovies': favoriteMovies ?? [],
+      'watchlist': watchlist ?? [],
     };
   }
 
@@ -46,6 +70,33 @@ class UserModel extends UserEntity {
       phone: entity.phone,
       photoUrl: entity.photoUrl,
       createdAt: entity.createdAt,
+    );
+  }
+
+  // Create a copy with updated fields
+  UserModel copyWith({
+    String? id,
+    String? email,
+    String? name,
+    String? phone,
+    String? photoUrl,
+    DateTime? createdAt,
+    String? fcmToken,
+    DateTime? lastLoginAt,
+    List<String>? favoriteMovies,
+    List<String>? watchlist,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      photoUrl: photoUrl ?? this.photoUrl,
+      createdAt: createdAt ?? this.createdAt,
+      fcmToken: fcmToken ?? this.fcmToken,
+      lastLoginAt: lastLoginAt ?? this.lastLoginAt,
+      favoriteMovies: favoriteMovies ?? this.favoriteMovies,
+      watchlist: watchlist ?? this.watchlist,
     );
   }
 }
