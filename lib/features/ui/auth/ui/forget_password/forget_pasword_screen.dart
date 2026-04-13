@@ -1,5 +1,3 @@
-// lib/features/ui/auth/forgot_password_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../../core/utilities/aap_assets.dart';
@@ -62,10 +60,7 @@ class ForgotPasswordScreen extends StatelessWidget {
                 ),
                 child: const Text(
                   'Verify Email',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -97,11 +92,7 @@ class ForgotPasswordScreen extends StatelessWidget {
                     color: const Color(0xFFF6BD00),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.check,
-                    size: 30,
-                    color: Colors.black,
-                  ),
+                  child: const Icon(Icons.check, size: 30, color: Colors.black),
                 ),
                 const SizedBox(height: 20),
                 const Text(
@@ -116,10 +107,7 @@ class ForgotPasswordScreen extends StatelessWidget {
                 const Text(
                   'Please check your email for the password reset link',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.white54,
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.white54),
                 ),
                 const SizedBox(height: 20),
                 SizedBox(
