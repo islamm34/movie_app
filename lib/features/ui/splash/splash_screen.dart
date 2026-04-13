@@ -132,7 +132,7 @@ class _SplashScreenState extends State<SplashScreen> {
               if (isLastPage) {
                 // الانتقال للصفحة الرئيسية عند الضغط على Finish
 
-                Navigator.pushReplacementNamed(context, AppRoutes.home);
+                Navigator.pushReplacementNamed(context, AppRoutes.login);
               } else {
                 _pageController.nextPage(
                   duration: const Duration(milliseconds: 300),
