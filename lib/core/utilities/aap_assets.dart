@@ -14,6 +14,9 @@ abstract class AppAssets {
   static const String googleSvg = 'assets/images/svg/google.svg';
   static const String nameSvg = 'assets/images/svg/name.svg';
   static const String phoneSvg = 'assets/images/svg/phone.svg';
-  static const String forgotPasswordSvg =
-      'assets/images/svg/Forgot password.svg';
+  static const String forgotPasswordSvg = 'assets/images/svg/Forgot password.svg';
+  static const String homeSvg = 'assets/images/svg/home_icon.svg';
+  static const String searchSvg = 'assets/images/svg/search_icon.svg';
+  static const String exploreSvg = 'assets/images/svg/explore_icon.svg';
+  static const String profileSvg = 'assets/images/svg/Profiel_icon.svg';
 }
