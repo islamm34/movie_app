@@ -11,7 +11,6 @@ import '../../domain/movie_entity.dart';
 import '../../home_api/response_api.dart';
 
 import '../movie_repository.dart';
-
 class MovieRepositoryImpl implements MovieRepository {
   final MovieDataSource dataSource;
 
