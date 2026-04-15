@@ -28,7 +28,6 @@ class MovieDetailsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Hero image
             Stack(
               children: [
                 Container(
