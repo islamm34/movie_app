@@ -1,12 +1,17 @@
 // lib/features/ui/home/home_screen.dart
 
 import 'dart:async';
-import 'dart:ui' as ui;  // ✅ أضف هذا للـ ImageFilter
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:movie_app/features/ui/home/ui/tab_bar/explore/explore_screen.dart';
 import 'package:movie_app/features/ui/home/ui/tab_bar/profile/profile_screen.dart';
 import 'package:movie_app/features/ui/home/ui/tab_bar/search/search_screen.dart';
+import 'package:movie_app/features/ui/movie_details/ui/movie_details_screen.dart';
+import '../data_model/data_source/movie_data_source.dart';
+import '../domain/movie_entity.dart';
+import '../repository/repository_impl/movie_repository_impl.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../widgets/usecase/get_movies_usecase.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,11 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: const Color(0xFF121312),
       body: Stack(
         children: [
-          Positioned.fill(
-            child: Container(
-              color: Colors.transparent,
-            ),
-          ),
+          Positioned.fill(child: Container(color: Colors.transparent)),
           SafeArea(
             child: Column(
               children: [
@@ -71,52 +72,20 @@ class HomeContentScreen extends StatefulWidget {
 class _HomeContentScreenState extends State<HomeContentScreen> {
   late PageController _pageController;
   int _currentPage = 0;
-  String _currentImageUrl = 'https://picsum.photos/id/100/400/500';
+  List<MovieEntity> _movies = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
   Timer? _autoScrollTimer;
 
-  final List<Map<String, dynamic>> movies = [
-    {
-      'title': 'ANIEL ELGORT',
-      'subtitle': 'TIME IS THE ENEMY',
-      'rating': '7.7',
-      'imageId': 100,
-    },
-    {
-      'title': 'KEVIN SPACEY',
-      'subtitle': 'TIME IS THE ENEMY',
-      'rating': '8.2',
-      'imageId': 101,
-    },
-    {
-      'title': 'LEXI JAMES',
-      'subtitle': 'TIME IS THE ENEMY',
-      'rating': '6.9',
-      'imageId': 102,
-    },
-    {
-      'title': 'ELIZA GONZALEZ',
-      'subtitle': 'TIME IS THE ENEMY',
-      'rating': '7.5',
-      'imageId': 103,
-    },
-    {
-      'title': 'JOHN HAMM',
-      'subtitle': 'TIME IS THE ENEMY',
-      'rating': '8.0',
-      'imageId': 104,
-    },
-  ];
-
-  final List<int> validImageIds = [
-    1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
-    11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-  ];
+  final GetMoviesUseCase _getMoviesUseCase = GetMoviesUseCase(
+    MovieRepositoryImpl(dataSource: MovieDataSource()),
+  );
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController(viewportFraction: 0.7);
-    _startAutoScroll();
+    _loadMovies();
   }
 
   @override
@@ -126,11 +95,35 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
     super.dispose();
   }
 
+  Future<void> _loadMovies() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final movies = await _getMoviesUseCase.execute(limit: 100);
+      setState(() {
+        _movies = movies;
+        _isLoading = false;
+      });
+
+      if (_movies.isNotEmpty) {
+        _startAutoScroll();
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
   void _startAutoScroll() {
     _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (_pageController.hasClients) {
+      if (_pageController.hasClients && _movies.isNotEmpty) {
         int nextPage = _currentPage + 1;
-        if (nextPage >= movies.length) {
+        if (nextPage >= _movies.length) {
           nextPage = 0;
         }
         _pageController.animateToPage(
@@ -151,33 +144,76 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
     _startAutoScroll();
   }
 
+  void _navigateToMovieDetails(MovieEntity movie) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MovieDetailsScreen(movie: movie),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFFF6BD00)),
+      );
+    }
+
+    if (_errorMessage.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 60),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage,
+              style: const TextStyle(color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadMovies,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFF6BD00),
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_movies.isEmpty) {
+      return const Center(
+        child: Text(
+          'No movies available',
+          style: TextStyle(color: Colors.white),
+        ),
+      );
+    }
+
     return Stack(
       children: [
-        // ✅ الخلفية مع تأثير ضبابي (Blur)
+        // Background image with blur
         Positioned.fill(
           child: Image.network(
-            _currentImageUrl,
+            _movies[_currentPage].backgroundImage,
             fit: BoxFit.cover,
             errorBuilder: (context, error, stackTrace) {
               return Container(color: Colors.grey[800]);
             },
           ),
         ),
-        // ✅ طبقة ضبابية (Blur) بنسبة 40%
         Positioned.fill(
           child: BackdropFilter(
-            filter: ui.ImageFilter.blur(
-              sigmaX: 8.0,   // ✅ مستوى الضبابية الأفقي (40%)
-              sigmaY: 8.0,   // ✅ مستوى الضبابية الرأسي (40%)
-            ),
-            child: Container(
-              color: Colors.black.withOpacity(0.3), // ✅ طبقة داكنة خفيفة
-            ),
+            filter: ui.ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
+            child: Container(color: Colors.black.withOpacity(0.3)),
           ),
         ),
-        // ✅ المحتوى الرئيسي
+        // Main content
         SafeArea(
           child: SingleChildScrollView(
             child: Padding(
@@ -185,8 +221,8 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(
-                    child: const Text(
+                  const Center(
+                    child: Text(
                       'Available Now',
                       style: TextStyle(
                         color: Colors.white,
@@ -200,35 +236,38 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
                     height: 400,
                     child: PageView.builder(
                       controller: _pageController,
-                      itemCount: movies.length,
+                      itemCount: _movies.length,
                       onPageChanged: (index) {
                         setState(() {
                           _currentPage = index;
-                          _currentImageUrl = 'https://picsum.photos/id/${movies[index]['imageId']}/400/500';
                         });
                         _resetAutoScroll();
                       },
                       itemBuilder: (context, index) {
                         final isCenter = index == _currentPage;
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          margin: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: isCenter ? 0 : 20,
+                        final movie = _movies[index];
+                        return GestureDetector(
+                          onTap: () => _navigateToMovieDetails(movie),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            margin: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: isCenter ? 0 : 20,
+                            ),
+                            height: isCenter ? 430 : 350,
+                            width: isCenter ? 300 : 260,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.5),
+                                  blurRadius: isCenter ? 20 : 10,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: _buildMovieCard(movie, isCenter),
                           ),
-                          height: isCenter ? 430 : 350,
-                          width: isCenter ? 300 : 260,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.5),
-                                blurRadius: isCenter ? 20 : 10,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: _buildMovieCard(movies[index], isCenter),
                         );
                       },
                     ),
@@ -247,18 +286,20 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
                     height: 150,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      itemCount: validImageIds.length,
+                      itemCount: _movies.length,
                       itemBuilder: (context, index) {
-                        return Container(
-                          width: 120,
-                          margin: const EdgeInsets.only(right: 12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            image: DecorationImage(
-                              image: NetworkImage(
-                                'https://picsum.photos/id/${validImageIds[index]}/120/150',
+                        final movie = _movies[index];
+                        return GestureDetector(
+                          onTap: () => _navigateToMovieDetails(movie),
+                          child: Container(
+                            width: 120,
+                            margin: const EdgeInsets.only(right: 12),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              image: DecorationImage(
+                                image: NetworkImage(movie.mediumCoverImage),
+                                fit: BoxFit.cover,
                               ),
-                              fit: BoxFit.cover,
                             ),
                           ),
                         );
@@ -279,18 +320,20 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
                     height: 150,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      itemCount: validImageIds.length,
+                      itemCount: _movies.length,
                       itemBuilder: (context, index) {
-                        return Container(
-                          width: 120,
-                          margin: const EdgeInsets.only(right: 12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            image: DecorationImage(
-                              image: NetworkImage(
-                                'https://picsum.photos/id/${validImageIds[index]}/120/150',
+                        final movie = _movies[index];
+                        return GestureDetector(
+                          onTap: () => _navigateToMovieDetails(movie),
+                          child: Container(
+                            width: 120,
+                            margin: const EdgeInsets.only(right: 12),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              image: DecorationImage(
+                                image: NetworkImage(movie.mediumCoverImage),
+                                fit: BoxFit.cover,
                               ),
-                              fit: BoxFit.cover,
                             ),
                           ),
                         );
@@ -307,14 +350,14 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
     );
   }
 
-  Widget _buildMovieCard(Map<String, dynamic> movie, bool isCenter) {
+  Widget _buildMovieCard(MovieEntity movie, bool isCenter) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: Stack(
         fit: StackFit.expand,
         children: [
           Image.network(
-            'https://picsum.photos/id/${movie['imageId']}/400/500',
+            movie.largeCoverImage,
             fit: BoxFit.cover,
             errorBuilder: (context, error, stackTrace) {
               return Container(
@@ -355,7 +398,7 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
                   const Icon(Icons.star, color: Color(0xFFF6BD00), size: 14),
                   const SizedBox(width: 4),
                   Text(
-                    movie['rating'],
+                    movie.formattedRating,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -375,7 +418,7 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    movie['title'],
+                    movie.titleEnglish.toUpperCase(),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -386,7 +429,7 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    movie['subtitle'],
+                    movie.genresString,
                     style: const TextStyle(color: Colors.white70, fontSize: 12),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

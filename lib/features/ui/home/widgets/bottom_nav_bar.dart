@@ -18,9 +18,10 @@ class BottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 60,
+      width: 400,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.transparent,  // ✅ شفاف تماماً
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(30),
         border: Border.all(
           color: const Color(0xFFF6BD00).withOpacity(0.2),
@@ -30,16 +31,16 @@ class BottomNavBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(0, AppAssets.homeSvg, 'Home'),
-          _buildNavItem(1, AppAssets.searchSvg, 'Search'),
-          _buildNavItem(2, AppAssets.exploreSvg, 'Explore'),
-          _buildNavItem(3, AppAssets.profileSvg, 'Profile'),
+          _buildNavItem(0, AppAssets.homeSvg,),
+          _buildNavItem(1, AppAssets.searchSvg, ),
+          _buildNavItem(2, AppAssets.exploreSvg, ),
+          _buildNavItem(3, AppAssets.profileSvg, ),
         ],
       ),
     );
   }
 
-  Widget _buildNavItem(int index, String iconPath, String label) {
+  Widget _buildNavItem(int index, String iconPath) {
     final isSelected = currentIndex == index;
     return Expanded(
       child: GestureDetector(
@@ -58,14 +59,6 @@ class BottomNavBar extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: isSelected ? const Color(0xFFF6BD00) : Colors.white70,
-              ),
-            ),
           ],
         ),
       ),
