@@ -54,14 +54,12 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
     try {
       final Uri uri = Uri.parse(url);
 
-      // التحقق مما إذا كان الرابط يمكن فتحه
       if (await canLaunchUrl(uri)) {
         await launchUrl(
           uri,
           mode: LaunchMode.externalApplication,
         );
       } else {
-        // محاولة فتح الرابط في المتصفح
         await launchUrl(
           uri,
           mode: LaunchMode.platformDefault,
@@ -312,7 +310,7 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                 ],
               ),
 
-              // ==================== Stats Row ====================
+              // ==================== Stats Row (إعجابات، وقت، تقييم) ====================
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 child: Row(
@@ -323,9 +321,10 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                       value: movie.likeCount.toString(),
                       color: const Color(0xFFF6BD00),
                     ),
+                    // ✅ عرض الوقت بالدقائق
                     _buildStatCard(
-                      icon: Icons.comment,
-                      value: '${movie.cast.length}',
+                      icon: Icons.access_time,
+                      value: '${movie.runtime}',
                       color: const Color(0xFFF6BD00),
                     ),
                     _buildStatCard(
