@@ -45,27 +45,27 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  // الحصول على المستخدم الحالي
   Future<void> _getCurrentUser() async {
     final user = FirebaseAuth.instance.currentUser;
     setState(() {
-      _currentUserId = user?.uid ?? 'guest';
+      _currentUserId = user?.uid ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
     });
     await _loadInitialMovies();
     await _loadRecentMovies();
   }
 
-  // الحصول على مفتاح التخزين الخاص بالمستخدم
   String _getUserStorageKey() {
+    // مفتاح فريد لكل مستخدم
     return 'recent_movies_${_currentUserId ?? "guest"}';
   }
 
-  // تحميل الأفلام الخاصة بالمستخدم الحالي
   Future<void> _loadRecentMovies() async {
     if (_currentUserId == null) return;
 
     final prefs = await SharedPreferences.getInstance();
     final recentMoviesJson = prefs.getStringList(_getUserStorageKey()) ?? [];
+
+    // تأكد من أن القائمة خاصة بالمستخدم الحالي فقط
     setState(() {
       _recentMovies = recentMoviesJson.map((json) {
         final parts = json.split('|||');
@@ -80,7 +80,6 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  // حفظ الفيلم الخاص بالمستخدم الحالي
   Future<void> _saveRecentMovie(MovieEntity movie) async {
     if (_currentUserId == null) return;
 
@@ -101,7 +100,6 @@ class _SearchScreenState extends State<SearchScreen> {
 
     await prefs.setStringList(storageKey, recentMoviesJson);
 
-    // تحديث القائمة
     final updatedMovies = recentMoviesJson.map((json) {
       final parts = json.split('|||');
       return {
@@ -118,10 +116,8 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  // مسح جميع الأفلام الخاصة بالمستخدم الحالي
   Future<void> _clearRecentMovies() async {
     if (_currentUserId == null) return;
-
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_getUserStorageKey());
     setState(() {
@@ -129,7 +125,6 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  // إزالة فيلم معين من قائمة المستخدم
   Future<void> _removeRecentMovie(int index) async {
     if (_currentUserId == null) return;
 
@@ -173,7 +168,6 @@ class _SearchScreenState extends State<SearchScreen> {
       setState(() {
         _isLoading = false;
       });
-      print('Error loading movies: $e');
     }
   }
 
@@ -184,9 +178,13 @@ class _SearchScreenState extends State<SearchScreen> {
         _searchResults = [];
       } else {
         _searchResults = _allMovies
-            .where((movie) =>
-        movie.title.toLowerCase().contains(query.toLowerCase()) ||
-            movie.titleEnglish.toLowerCase().contains(query.toLowerCase()))
+            .where(
+              (movie) =>
+          movie.title.toLowerCase().contains(query.toLowerCase()) ||
+              movie.titleEnglish.toLowerCase().contains(
+                query.toLowerCase(),
+              ),
+        )
             .toList();
       }
     });
@@ -281,9 +279,7 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
 
             // ==================== Results Section ====================
-            Expanded(
-              child: _buildContent(),
-            ),
+            Expanded(child: _buildContent()),
           ],
         ),
       ),
@@ -313,14 +309,12 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildInitialState() {
-    return const Center(
-      child: Text(
-        'Search for your favorite movies',
-        style: TextStyle(
-          fontFamily: 'Roboto',
-          fontSize: 16,
-          color: Colors.white54,
-        ),
+    return Center(
+      child: Image.asset(
+        AppAssets.Empty1,
+        width: 200,
+        height: 200,
+        color: Colors.amber,
       ),
     );
   }
@@ -400,23 +394,10 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
                 subtitle: Row(
                   children: [
-                    const Icon(
-                      Icons.star,
-                      color: Color(0xFFF6BD00),
-                      size: 12,
-                    ),
+                    const Icon(Icons.star, color: Color(0xFFF6BD00), size: 12),
                     const SizedBox(width: 4),
                     Text(
                       movie['rating'],
-                      style: const TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 12,
-                        color: Colors.white54,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      movie['year'],
                       style: const TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 12,
@@ -458,7 +439,7 @@ class _SearchScreenState extends State<SearchScreen> {
             width: 124,
             height: 124,
             colorFilter: const ColorFilter.mode(
-              Colors.white54,
+              Colors.amber,
               BlendMode.srcIn,
             ),
           ),
@@ -507,89 +488,73 @@ class _SearchScreenState extends State<SearchScreen> {
       onTap: () => _navigateToMovieDetails(movie),
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF282A28),
           borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black,
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Movie Image
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-              child: Image.network(
-                movie.mediumCoverImage,
-                height: 180,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            children: [
+              Image.network(
+                movie.largeCoverImage,
+                height: 280,
                 width: double.infinity,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
-                    height: 180,
+                    height: 280,
                     width: double.infinity,
                     color: Colors.grey[800],
                     child: const Icon(
                       Icons.movie,
                       color: Colors.white54,
-                      size: 40,
+                      size: 50,
                     ),
                   );
                 },
               ),
-            ),
-            // Rating
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.star,
-                    color: Color(0xFFF6BD00),
-                    size: 14,
+              Positioned(
+                top: 12,
+                left: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    movie.formattedRating,
-                    style: const TextStyle(
-                      fontFamily: 'Roboto',
-                      fontWeight: FontWeight.w500,
-                      fontSize: 12,
-                      color: Colors.white,
-                    ),
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(15),
                   ),
-                ],
-              ),
-            ),
-            // Title
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                movie.titleEnglish,
-                style: const TextStyle(
-                  fontFamily: 'Roboto',
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: Colors.white,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            // Year
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-              child: Text(
-                movie.year.toString(),
-                style: const TextStyle(
-                  fontFamily: 'Roboto',
-                  fontWeight: FontWeight.w400,
-                  fontSize: 12,
-                  color: Colors.white54,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.star,
+                        color: Color(0xFFF6BD00),
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        movie.formattedRating,
+                        style: const TextStyle(
+                          fontFamily: 'Roboto',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
