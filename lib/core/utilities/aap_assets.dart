@@ -19,4 +19,5 @@ abstract class AppAssets {
   static const String searchSvg = 'assets/images/svg/search_icon.svg';
   static const String exploreSvg = 'assets/images/svg/explore_icon.svg';
   static const String profileSvg = 'assets/images/svg/Profiel_icon.svg';
+  static const String search_empty = 'assets/images/svg/search_empty.svg';
 }
