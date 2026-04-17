@@ -1,16 +1,16 @@
 // lib/data/movie_details/datasources/movie_details_data_source.dart
 
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import '../../../../../core/network/dio_client.dart';
 import '../../api_responsed/api_responsed.dart';
 
 class MovieDetailsDataSource {
-
-  static const String baseUrl = 'https://movies-api.accel.li/api/v2';
+  final DioClient _dioClient =  DioClient();
 
   Future<ApiResponsed> fetchMovieDetails(int movieId) async {
     try {
-      final uri = Uri.parse('$baseUrl/movie_details.json').replace(
+      final response = await _dioClient.get(
+        '/movie_details.json',
         queryParameters: {
           'movie_id': movieId.toString(),
           'with_images': 'true',
@@ -18,13 +18,8 @@ class MovieDetailsDataSource {
         },
       );
 
-      print('Fetching movie details from: $uri');
-
-      final response = await http.get(uri);
-
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body);
-        return ApiResponsed.fromJson(json as Map<String, dynamic>);
+        return ApiResponsed.fromJson(response.data as Map<String, dynamic>);
       } else {
         throw Exception('Failed to load movie details: ${response.statusCode}');
       }
