@@ -1,10 +1,11 @@
-// lib/domain/movie/usecases/get_movies_usecase.dart
+// lib/features/ui/home/widgets/usecase/get_movies_usecase.dart
+
 
 import '../../domain/movie_entity.dart';
-import '../../repository/movie_repository.dart';
+import '../../repository/repository_impl/movie_repository_impl.dart';
 
 class GetMoviesUseCase {
-  final MovieRepository repository;
+  final MovieRepositoryImpl repository;
 
   GetMoviesUseCase(this.repository);
 
@@ -13,12 +14,23 @@ class GetMoviesUseCase {
     int limit = 20,
     String? genre,
     String? sortBy,
+    bool fetchAll = false,
   }) async {
-    return await repository.getMovies(
-      page: page,
-      limit: limit,
-      genre: genre,
-      sortBy: sortBy,
-    );
+    if (fetchAll) {
+      // جلب جميع الأفلام
+      final allMovies = await repository.getAllMovies(
+        genre: genre,
+        sortBy: sortBy,
+      );
+      return allMovies;
+    } else {
+      // جلب صفحة واحدة فقط
+      return await repository.getMovies(
+        page: page,
+        limit: limit,
+        genre: genre,
+        sortBy: sortBy,
+      );
+    }
   }
 }

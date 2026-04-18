@@ -72,7 +72,9 @@ class HomeContentScreen extends StatefulWidget {
 class _HomeContentScreenState extends State<HomeContentScreen> {
   late PageController _pageController;
   int _currentPage = 0;
-  List<MovieEntity> _movies = [];
+  List<MovieEntity> _carouselMovies = [];
+  List<MovieEntity> _recommendedMovies = [];
+  List<MovieEntity> _popularMovies = [];
   bool _isLoading = true;
   String _errorMessage = '';
   Timer? _autoScrollTimer;
@@ -85,7 +87,7 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
   void initState() {
     super.initState();
     _pageController = PageController(viewportFraction: 0.7);
-    _loadMovies();
+    _loadAllMovies();
   }
 
   @override
@@ -95,23 +97,65 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
     super.dispose();
   }
 
-  Future<void> _loadMovies() async {
+  Future<void> _loadAllMovies() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
       _errorMessage = '';
     });
 
     try {
-      final movies = await _getMoviesUseCase.execute(limit: 100);
+      // جلب 50 فيلماً
+      final allMovies = await _getMoviesUseCase.execute(limit: 50);
+
+      if (!mounted) return;
+
+      final totalMovies = allMovies.length;
+      print('📊 Total movies fetched: $totalMovies');
+
+      // تقسيم الأفلام بشكل متساوٍ
+      if (totalMovies >= 30) {
+        // إذا كان هناك 30 فيلماً أو أكثر
+        final carouselCount = (totalMovies / 3).ceil();
+        final recommendedCount = (totalMovies / 3).ceil();
+
+        _carouselMovies = allMovies.take(carouselCount).toList();
+        _recommendedMovies = allMovies.skip(carouselCount).take(recommendedCount).toList();
+        _popularMovies = allMovies.skip(carouselCount + recommendedCount).toList();
+      } else if (totalMovies >= 20) {
+        // إذا كان هناك 20 فيلماً أو أكثر
+        _carouselMovies = allMovies.take(10).toList();
+        _recommendedMovies = allMovies.skip(10).take(10).toList();
+        _popularMovies = [];
+      } else if (totalMovies >= 10) {
+        // إذا كان هناك 10 أفلام أو أكثر
+        _carouselMovies = allMovies.take(8).toList();
+        _recommendedMovies = allMovies.skip(8).take(7).toList();
+        _popularMovies = [];
+      } else {
+        // أقل من 10 أفلام
+        _carouselMovies = allMovies;
+        _recommendedMovies = [];
+        _popularMovies = [];
+      }
+
       setState(() {
-        _movies = movies;
+        _carouselMovies = _carouselMovies;
+        _recommendedMovies = _recommendedMovies;
+        _popularMovies = _popularMovies;
         _isLoading = false;
       });
 
-      if (_movies.isNotEmpty) {
+      print('✅ Carousel: ${_carouselMovies.length} movies');
+      print('✅ Recommended: ${_recommendedMovies.length} movies');
+      print('✅ Popular: ${_popularMovies.length} movies');
+
+      if (_carouselMovies.isNotEmpty) {
         _startAutoScroll();
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = e.toString();
         _isLoading = false;
@@ -121,9 +165,9 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
 
   void _startAutoScroll() {
     _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (_pageController.hasClients && _movies.isNotEmpty) {
+      if (_pageController.hasClients && _carouselMovies.isNotEmpty && mounted) {
         int nextPage = _currentPage + 1;
-        if (nextPage >= _movies.length) {
+        if (nextPage >= _carouselMovies.length) {
           nextPage = 0;
         }
         _pageController.animateToPage(
@@ -175,7 +219,7 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _loadMovies,
+              onPressed: _loadAllMovies,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFF6BD00),
               ),
@@ -186,7 +230,7 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
       );
     }
 
-    if (_movies.isEmpty) {
+    if (_carouselMovies.isEmpty) {
       return const Center(
         child: Text(
           'No movies available',
@@ -200,7 +244,7 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
         // Background image with blur
         Positioned.fill(
           child: Image.network(
-            _movies[_currentPage].backgroundImage,
+            _carouselMovies[_currentPage].backgroundImage,
             fit: BoxFit.cover,
             errorBuilder: (context, error, stackTrace) {
               return Container(color: Colors.grey[800]);
@@ -232,20 +276,23 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  // Carousel
                   SizedBox(
                     height: 400,
                     child: PageView.builder(
                       controller: _pageController,
-                      itemCount: _movies.length,
+                      itemCount: _carouselMovies.length,
                       onPageChanged: (index) {
-                        setState(() {
-                          _currentPage = index;
-                        });
+                        if (mounted) {
+                          setState(() {
+                            _currentPage = index;
+                          });
+                        }
                         _resetAutoScroll();
                       },
                       itemBuilder: (context, index) {
                         final isCenter = index == _currentPage;
-                        final movie = _movies[index];
+                        final movie = _carouselMovies[index];
                         return GestureDetector(
                           onTap: () => _navigateToMovieDetails(movie),
                           child: AnimatedContainer(
@@ -273,74 +320,82 @@ class _HomeContentScreenState extends State<HomeContentScreen> {
                     ),
                   ),
                   const SizedBox(height: 30),
-                  const Text(
-                    'Recommended for You',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+
+                  // ✅ Recommended for You
+                  if (_recommendedMovies.isNotEmpty) ...[
+                    const Text(
+                      'Recommended for You',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 150,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _movies.length,
-                      itemBuilder: (context, index) {
-                        final movie = _movies[index];
-                        return GestureDetector(
-                          onTap: () => _navigateToMovieDetails(movie),
-                          child: Container(
-                            width: 120,
-                            margin: const EdgeInsets.only(right: 12),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              image: DecorationImage(
-                                image: NetworkImage(movie.mediumCoverImage),
-                                fit: BoxFit.cover,
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 150,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _recommendedMovies.length,
+                        itemBuilder: (context, index) {
+                          final movie = _recommendedMovies[index];
+                          return GestureDetector(
+                            onTap: () => _navigateToMovieDetails(movie),
+                            child: Container(
+                              width: 120,
+                              margin: const EdgeInsets.only(right: 12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                image: DecorationImage(
+                                  image: NetworkImage(movie.mediumCoverImage),
+                                  fit: BoxFit.cover,
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 30),
-                  const Text(
-                    'Popular Movies',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(height: 30),
+                  ],
+
+                  // ✅ Popular Movies
+                  if (_popularMovies.isNotEmpty) ...[
+                    const Text(
+                      'Popular Movies',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 150,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _movies.length,
-                      itemBuilder: (context, index) {
-                        final movie = _movies[index];
-                        return GestureDetector(
-                          onTap: () => _navigateToMovieDetails(movie),
-                          child: Container(
-                            width: 120,
-                            margin: const EdgeInsets.only(right: 12),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              image: DecorationImage(
-                                image: NetworkImage(movie.mediumCoverImage),
-                                fit: BoxFit.cover,
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 150,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _popularMovies.length,
+                        itemBuilder: (context, index) {
+                          final movie = _popularMovies[index];
+                          return GestureDetector(
+                            onTap: () => _navigateToMovieDetails(movie),
+                            child: Container(
+                              width: 120,
+                              margin: const EdgeInsets.only(right: 12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                image: DecorationImage(
+                                  image: NetworkImage(movie.mediumCoverImage),
+                                  fit: BoxFit.cover,
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 30),
+                    const SizedBox(height: 30),
+                  ],
                 ],
               ),
             ),
