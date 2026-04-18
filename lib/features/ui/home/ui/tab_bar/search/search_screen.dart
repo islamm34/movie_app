@@ -48,7 +48,8 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<void> _getCurrentUser() async {
     final user = FirebaseAuth.instance.currentUser;
     setState(() {
-      _currentUserId = user?.uid ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
+      _currentUserId =
+          user?.uid ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
     });
     await _loadInitialMovies();
     await _loadRecentMovies();
@@ -87,7 +88,8 @@ class _SearchScreenState extends State<SearchScreen> {
     final storageKey = _getUserStorageKey();
     List<String> recentMoviesJson = prefs.getStringList(storageKey) ?? [];
 
-    final movieKey = '${movie.id}|||${movie.titleEnglish}|||${movie.formattedRating}|||${movie.mediumCoverImage}|||${movie.year}';
+    final movieKey =
+        '${movie.id}|||${movie.titleEnglish}|||${movie.formattedRating}|||${movie.mediumCoverImage}|||${movie.year}';
 
     // إزالة إذا كان موجوداً مسبقاً
     recentMoviesJson.remove(movieKey);
@@ -180,11 +182,11 @@ class _SearchScreenState extends State<SearchScreen> {
         _searchResults = _allMovies
             .where(
               (movie) =>
-          movie.title.toLowerCase().contains(query.toLowerCase()) ||
-              movie.titleEnglish.toLowerCase().contains(
-                query.toLowerCase(),
-              ),
-        )
+                  movie.title.toLowerCase().contains(query.toLowerCase()) ||
+                  movie.titleEnglish.toLowerCase().contains(
+                    query.toLowerCase(),
+                  ),
+            )
             .toList();
       }
     });
@@ -265,13 +267,13 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                     suffixIcon: _isSearching
                         ? IconButton(
-                      icon: const Icon(
-                        Icons.close,
-                        color: Colors.white54,
-                        size: 20,
-                      ),
-                      onPressed: _clearSearch,
-                    )
+                            icon: const Icon(
+                              Icons.close,
+                              color: Colors.white54,
+                              size: 20,
+                            ),
+                            onPressed: _clearSearch,
+                          )
                         : null,
                   ),
                 ),
@@ -416,7 +418,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
                 onTap: () {
                   final movieEntity = _allMovies.firstWhere(
-                        (m) => m.id == movie['id'],
+                    (m) => m.id == movie['id'],
                     orElse: () => _allMovies.first,
                   );
                   _navigateToMovieDetails(movieEntity);
@@ -438,10 +440,7 @@ class _SearchScreenState extends State<SearchScreen> {
             AppAssets.search_empty,
             width: 124,
             height: 124,
-            colorFilter: const ColorFilter.mode(
-              Colors.amber,
-              BlendMode.srcIn,
-            ),
+            colorFilter: const ColorFilter.mode(Colors.amber, BlendMode.srcIn),
           ),
           const SizedBox(height: 20),
           const Text(
