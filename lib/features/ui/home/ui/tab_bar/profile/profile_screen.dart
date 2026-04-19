@@ -1,15 +1,12 @@
 import 'dart:convert';
-import 'dart:math';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:movie_app/core/utilities/aap_assets.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:avatar_maker/avatar_maker.dart';
+import '../../../../../../core/utilities/aap_assets.dart';
 import '../../../../../../core/utilities/app_routs.dart';
 import '../../../../movie_details/ui/movie_details_screen.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -25,18 +22,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
   bool _isAvatarLoading = true;
 
-  late AvatarMakerController _avatarMakerController;
-  Uint8List? _savedAvatarBytes;
-  final GlobalKey _avatarKey = GlobalKey();
+  String? _savedAvatarBase64;
 
-  // متغير لتحديث الـ UI بعد الحفظ
-  int _avatarVersion = 0;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Stream subscriptions
+  Stream<QuerySnapshot>? _watchlistStream;
+  Stream<QuerySnapshot>? _historyStream;
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
-    _loadUserMovies();
+    _setupFirestoreStreams();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   Future<void> _loadUserData() async {
@@ -47,103 +50,152 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await _loadSavedAvatar();
   }
 
-  // تحميل الـ Avatar المحفوظ
   Future<void> _loadSavedAvatar() async {
     setState(() {
       _isAvatarLoading = true;
     });
 
     final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
-    final prefs = await SharedPreferences.getInstance();
-    final avatarKey = 'avatar_bytes_$userId';
 
-    // إنشاء Controller جديد
-    _avatarMakerController = NonPersistentAvatarMakerController(
-      customizedPropertyCategories: [],
-    );
-
-    // تحميل الصورة المحفوظة
-    final String? avatarBytesString = prefs.getString(avatarKey);
-
-    if (avatarBytesString != null && avatarBytesString.isNotEmpty) {
+    // محاولة تحميل من Firestore أولاً
+    if (FirebaseAuth.instance.currentUser?.uid != null) {
       try {
-        final bytes = base64Decode(avatarBytesString);
-        setState(() {
-          _savedAvatarBytes = bytes;
-        });
-        print('Avatar loaded successfully! Size: ${bytes.length} bytes');
+        final doc = await _firestore.collection('users').doc(userId).get();
+        if (doc.exists) {
+          final data = doc.data();
+          if (data != null && data['avatar'] != null && data['avatar'].toString().isNotEmpty) {
+            setState(() {
+              _savedAvatarBase64 = data['avatar'] as String?;
+            });
+            print('✅ Avatar loaded from Firestore');
+            setState(() {
+              _isAvatarLoading = false;
+            });
+            return;
+          }
+        }
       } catch (e) {
-        print('Error loading avatar: $e');
-        _savedAvatarBytes = null;
+        print('Error loading avatar from Firestore: $e');
       }
-    } else {
-      _savedAvatarBytes = null;
     }
+
+    // تحميل من SharedPreferences كنسخة احتياطية
+    final prefs = await SharedPreferences.getInstance();
+    final avatarKey = 'avatar_$userId';
+    _savedAvatarBase64 = prefs.getString(avatarKey);
 
     setState(() {
       _isAvatarLoading = false;
     });
   }
 
-  // تصوير الـ Avatar وحفظه
-  Future<void> _captureAndSaveAvatar() async {
-    try {
-      print('Capturing avatar...');
+  void _setupFirestoreStreams() {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
 
-      final RenderRepaintBoundary? boundary = _avatarKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    // إعداد الـ Stream للـ Watchlist
+    _watchlistStream = _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('watchlist')
+        .orderBy('addedAt', descending: true)
+        .snapshots();
 
-      if (boundary == null) {
-        print('Boundary is null');
-        return;
-      }
+    // إعداد الـ Stream للـ History
+    _historyStream = _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('history')
+        .orderBy('watchedAt', descending: true)
+        .limit(20)
+        .snapshots();
+  }
 
-      final ui.Image image = await boundary.toImage(pixelRatio: 2.0);
-      final ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+  // تحميل الـ Watchlist من Firestore مع Stream
+  Future<void> _loadWatchlistFromFirestore() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
 
-      if (byteData != null) {
-        final bytes = byteData.buffer.asUint8List();
-        final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
-        final prefs = await SharedPreferences.getInstance();
-        final avatarKey = 'avatar_bytes_$userId';
-
-        // تحويل bytes إلى Base64 string وحفظه
-        final avatarString = base64Encode(bytes);
-        await prefs.setString(avatarKey, avatarString);
-
-        setState(() {
-          _savedAvatarBytes = bytes;
-          _avatarVersion++;
+    _watchlistStream?.listen((snapshot) {
+      final List<Map<String, dynamic>> movies = [];
+      for (var doc in snapshot.docs) {
+        final Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        movies.add({
+          'id': data['id'] ?? 0,
+          'title': data['title'] ?? '',
+          'rating': data['rating'] ?? '',
+          'imageUrl': data['imageUrl'] ?? '',
+          'year': data['year'] ?? '',
+          'addedAt': data['addedAt'],
         });
-
-        print('Avatar saved successfully! Size: ${bytes.length} bytes');
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Avatar saved successfully!'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 1),
-            ),
-          );
-        }
-      } else {
-        print('Failed to capture avatar - byteData is null');
       }
-    } catch (e) {
-      print('Error capturing avatar: $e');
-    }
+
+      if (mounted) {
+        setState(() {
+          _watchlistMovies = movies;
+        });
+      }
+      print('✅ Watchlist updated: ${movies.length} movies');
+    }, onError: (error) {
+      print('❌ Error loading watchlist: $error');
+    });
+  }
+
+  // تحميل الـ History من Firestore مع Stream
+  Future<void> _loadHistoryFromFirestore() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    _historyStream?.listen((snapshot) {
+      final List<Map<String, dynamic>> movies = [];
+      for (var doc in snapshot.docs) {
+        final Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        movies.add({
+          'id': data['id'] ?? 0,
+          'title': data['title'] ?? '',
+          'rating': data['rating'] ?? '',
+          'imageUrl': data['imageUrl'] ?? '',
+          'year': data['year'] ?? '',
+          'watchedAt': data['watchedAt'],
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _historyMovies = movies;
+        });
+      }
+      print('✅ History updated: ${movies.length} movies');
+    }, onError: (error) {
+      print('❌ Error loading history: $error');
+    });
   }
 
   Future<void> _loadUserMovies() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
-    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _isLoading = true;
+    });
 
-    final watchlistJson = prefs.getStringList('watchlist_$userId') ?? [];
-    final historyJson = prefs.getStringList('history_$userId') ?? [];
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
+    if (userId != null) {
+      // تحميل الـ Watchlist و History من Firestore مع Stream
+      await _loadWatchlistFromFirestore();
+      await _loadHistoryFromFirestore();
+    } else {
+      // للمستخدمين الضيوف، تحميل من SharedPreferences
+      final guestId = 'guest';
+      final prefs = await SharedPreferences.getInstance();
+      final watchlistJson = prefs.getStringList('watchlist_$guestId') ?? [];
+      final historyJson = prefs.getStringList('history_$guestId') ?? [];
+
+      setState(() {
+        _watchlistMovies = _parseMovies(watchlistJson);
+        _historyMovies = _parseMovies(historyJson);
+      });
+    }
 
     setState(() {
-      _watchlistMovies = _parseMovies(watchlistJson);
-      _historyMovies = _parseMovies(historyJson);
       _isLoading = false;
     });
   }
@@ -161,20 +213,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }).toList();
   }
 
-  void _openAvatarCustomizer() async {
+  void _openEditProfile() async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AvatarCustomizerPage(
-          controller: _avatarMakerController,
-        ),
+        builder: (context) => const EditProfileScreen(),
       ),
     );
 
     if (result == true && mounted) {
-      // ننتظر شوية عشان الـ Avatar يترسم
-      await Future.delayed(const Duration(milliseconds: 300));
-      await _captureAndSaveAvatar();
+      await _loadSavedAvatar();
+      await _loadUserData();
       setState(() {});
     }
   }
@@ -201,27 +250,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    // لو فيه صورة محفوظة، نعرضها
-    if (_savedAvatarBytes != null) {
-      return CircleAvatar(
-        radius: 45,
-        backgroundColor: const Color(0xFF282A28),
+    if (_savedAvatarBase64 != null && _savedAvatarBase64!.isNotEmpty) {
+      return Container(
+        width: 90,
+        height: 90,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: Color(0xFF282A28),
+        ),
         child: ClipOval(
           child: Image.memory(
-            _savedAvatarBytes!,
+            base64Decode(_savedAvatarBase64!),
             width: 90,
             height: 90,
             fit: BoxFit.cover,
-            key: ValueKey(_avatarVersion),
             errorBuilder: (context, error, stackTrace) {
-              print('Error displaying saved avatar: $error');
-              return RepaintBoundary(
-                key: _avatarKey,
-                child: AvatarMakerAvatar(
-                  radius: 45,
-                  backgroundColor: const Color(0xFF282A28),
-                  controller: _avatarMakerController,
-                ),
+              print('Error loading avatar image: $error');
+              return const Icon(
+                Icons.person,
+                size: 50,
+                color: Colors.white54,
               );
             },
           ),
@@ -229,13 +277,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
-    // لو مفيش صورة محفوظة، نعرض الـ Avatar العادي
-    return RepaintBoundary(
-      key: _avatarKey,
-      child: AvatarMakerAvatar(
-        radius: 45,
-        backgroundColor: const Color(0xFF282A28),
-        controller: _avatarMakerController,
+    return Container(
+      width: 90,
+      height: 90,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        color: Color(0xFF282A28),
+      ),
+      child: const Icon(
+        Icons.person,
+        size: 50,
+        color: Colors.white54,
       ),
     );
   }
@@ -258,6 +310,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // إذا كان المستخدم مسجل، نبدأ تحميل البيانات
+    if (FirebaseAuth.instance.currentUser?.uid != null && _isLoading) {
+      _loadUserMovies();
+    } else if (FirebaseAuth.instance.currentUser?.uid == null && _isLoading) {
+      _loadUserMovies();
+    }
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -277,13 +336,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Column(
                               children: [
                                 GestureDetector(
-                                  onTap: _openAvatarCustomizer,
+                                  onTap: _openEditProfile,
                                   child: _buildAvatar(),
                                 ),
                                 const SizedBox(height: 10),
                                 Text(
                                   _currentUser?.displayName ??
-                                      (_currentUser?.email?.split('@').first ?? 'John Safwat'),
+                                      (_currentUser?.email?.split('@').first ??
+                                          'John Safwat'),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 18,
@@ -301,9 +361,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ],
                             ),
                             const Spacer(),
-                            _buildStatItem(_watchlistMovies.length.toString(), 'Wish List'),
+                            _buildStatItem(
+                              _watchlistMovies.length.toString(),
+                              'Wish List',
+                            ),
                             const SizedBox(width: 30),
-                            _buildStatItem(_historyMovies.length.toString(), 'History'),
+                            _buildStatItem(
+                              _historyMovies.length.toString(),
+                              'History',
+                            ),
                             const SizedBox(width: 10),
                           ],
                         ),
@@ -325,8 +391,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         labelColor: Colors.white,
                         unselectedLabelColor: Colors.grey,
                         tabs: [
-                          Tab(icon: Icon(Icons.list, color: Color(0xFFF6BD00)), text: 'Watch List'),
-                          Tab(icon: Icon(Icons.folder, color: Color(0xFFF6BD00)), text: 'History'),
+                          Tab(
+                            icon: Icon(Icons.list, color: Color(0xFFF6BD00)),
+                            text: 'Watch List',
+                          ),
+                          Tab(
+                            icon: Icon(Icons.folder, color: Color(0xFFF6BD00)),
+                            text: 'History',
+                          ),
                         ],
                       ),
                     ),
@@ -372,15 +444,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Expanded(
             child: ElevatedButton(
-              onPressed: _openAvatarCustomizer,
+              onPressed: _openEditProfile,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFF6BD00),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: const Text(
                 'Edit Profile',
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -391,11 +468,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: const Icon(Icons.logout, color: Colors.white, size: 20),
               label: const Text(
                 'Exit',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFE53935),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
@@ -417,8 +499,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-Image.asset(AppAssets.Empty1, width: 200, height: 200),
-             SizedBox(height: 10),
+            Image.asset(AppAssets.Empty1),
+            const SizedBox(height: 10),
+            const Text(
+              'No Movies Added',
+              style: TextStyle(color: Colors.white54, fontSize: 16),
+            ),
           ],
         ),
       );
@@ -435,14 +521,19 @@ Image.asset(AppAssets.Empty1, width: 200, height: 200),
       itemCount: movies.length,
       itemBuilder: (context, index) {
         final movie = movies[index];
+        final movieId = movie['id'] as int? ?? 0;
+        final movieTitle = movie['title'] as String? ?? '';
+        final movieRating = movie['rating'] as String? ?? '';
+        final movieImageUrl = movie['imageUrl'] as String? ?? '';
+
         return GestureDetector(
-          onTap: () => _navigateToMovieDetails(movie['id']),
+          onTap: () => _navigateToMovieDetails(movieId),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: Stack(
               children: [
                 Image.network(
-                  movie['imageUrl'],
+                  movieImageUrl,
                   fit: BoxFit.cover,
                   width: double.infinity,
                   height: double.infinity,
@@ -457,18 +548,28 @@ Image.asset(AppAssets.Empty1, width: 200, height: 200),
                   top: 5,
                   left: 5,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.6),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.star, color: Color(0xFFF6BD00), size: 10),
+                        const Icon(
+                          Icons.star,
+                          color: Color(0xFFF6BD00),
+                          size: 10,
+                        ),
                         const SizedBox(width: 2),
                         Text(
-                          movie['rating'],
-                          style: const TextStyle(color: Colors.white, fontSize: 10),
+                          movieRating,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
                         ),
                       ],
                     ),
@@ -479,78 +580,6 @@ Image.asset(AppAssets.Empty1, width: 200, height: 200),
           ),
         );
       },
-    );
-  }
-}
-
-// ==================== Avatar Customizer Page ====================
-class AvatarCustomizerPage extends StatefulWidget {
-  final AvatarMakerController controller;
-
-  const AvatarCustomizerPage({
-    super.key,
-    required this.controller,
-  });
-
-  @override
-  State<AvatarCustomizerPage> createState() => _AvatarCustomizerPageState();
-}
-
-class _AvatarCustomizerPageState extends State<AvatarCustomizerPage> {
-  @override
-  Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF121312),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () => Navigator.pop(context, true),
-        ),
-        title: const Text(
-          'Customize Avatar',
-          style: TextStyle(color: Color(0xFFF6BD00), fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Save',
-              style: TextStyle(color: Color(0xFFF6BD00), fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            Center(
-              child: AvatarMakerAvatar(
-                radius: 100,
-                backgroundColor: const Color(0xFF282A28),
-                controller: widget.controller,
-              ),
-            ),
-            const SizedBox(height: 30),
-            AvatarMakerCustomizer(
-              scaffoldWidth: min(600, width * 0.9),
-              controller: widget.controller,
-              theme: AvatarMakerThemeData(
-                boxDecoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -566,7 +595,11 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => 70.0;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context,
+      double shrinkOffset,
+      bool overlapsContent,
+      ) {
     return child;
   }
 

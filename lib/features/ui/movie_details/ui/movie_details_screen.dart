@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../home/domain/movie_entity.dart';
 import '../../home/repository/repository_impl/movie_repository_impl.dart';
 import '../../home/data_model/data_source/movie_data_source.dart';
@@ -37,6 +38,8 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
     MovieRepositoryImpl(dataSource: MovieDataSource()),
   );
 
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   @override
   void initState() {
     super.initState();
@@ -47,30 +50,127 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
     });
   }
 
-  // إضافة الفيلم إلى History
+  // حفظ في Firestore
+  Future<void> _addToFirestore(String collectionName, Map<String, dynamic> data) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final docRef = _firestore.collection('users').doc(userId).collection(collectionName).doc(data['id'].toString());
+
+      if (collectionName == 'watchlist') {
+        // للـ Watchlist: نضيف فقط إذا لم يكن موجود
+        final doc = await docRef.get();
+        if (!doc.exists) {
+          await docRef.set(data);
+        }
+      } else {
+        // للـ History: نضيف مع تحديث الوقت
+        await docRef.set(data, SetOptions(merge: true));
+      }
+
+      print('✅ Saved to Firestore: $collectionName');
+    } catch (e) {
+      print('❌ Error saving to Firestore: $e');
+    }
+  }
+
+  // حذف من Firestore
+  Future<void> _removeFromFirestore(String collectionName, String movieId) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      await _firestore.collection('users').doc(userId).collection(collectionName).doc(movieId).delete();
+      print('✅ Removed from Firestore: $collectionName');
+    } catch (e) {
+      print('❌ Error removing from Firestore: $e');
+    }
+  }
+
+  // التحقق من وجود الفيلم في Watchlist من Firestore
+  Future<bool> _isInWatchlistFirestore(int movieId) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return false;
+
+    try {
+      final doc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('watchlist')
+          .doc(movieId.toString())
+          .get();
+      return doc.exists;
+    } catch (e) {
+      print('❌ Error checking watchlist: $e');
+      return false;
+    }
+  }
+
+  // إضافة الفيلم إلى History (Firestore + SharedPreferences)
   Future<void> _addToHistory(MovieDetailsEntity movie) async {
-    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
+    final movieData = {
+      'id': movie.id,
+      'title': movie.titleEnglish,
+      'rating': movie.formattedRating,
+      'imageUrl': movie.largeCoverImage,
+      'year': movie.year,
+      'watchedAt': FieldValue.serverTimestamp(),
+    };
+
+    // حفظ في Firestore (للمستخدمين المسجلين)
+    if (userId != null) {
+      try {
+        await _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('history')
+            .doc(movie.id.toString())
+            .set(movieData);
+        print('✅ Movie added to history in Firestore');
+      } catch (e) {
+        print('❌ Error saving history to Firestore: $e');
+      }
+    }
+
+    // حفظ في SharedPreferences كنسخة احتياطية (للمستخدمين الضيوف)
     final prefs = await SharedPreferences.getInstance();
-    final historyKey = 'history_$userId';
+    final historyKey = 'history_${userId ?? 'guest'}';
     List<String> history = prefs.getStringList(historyKey) ?? [];
 
     final movieKey = '${movie.id}|||${movie.titleEnglish}|||${movie.formattedRating}|||${movie.largeCoverImage}|||${movie.year}';
 
-    // إزالة إذا كان موجوداً مسبقاً
     history.remove(movieKey);
-    // إضافة في البداية
     history.insert(0, movieKey);
-    // الاحتفاظ بآخر 20 فيلماً فقط
     if (history.length > 20) {
       history = history.take(20).toList();
     }
 
     await prefs.setStringList(historyKey, history);
+    print('✅ Movie added to history in SharedPreferences');
   }
 
-  // إضافة الفيلم إلى Watchlist
+  // إضافة الفيلم إلى Watchlist (Firestore + SharedPreferences)
   Future<void> _addToWatchlist(MovieDetailsEntity movie) async {
     final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+
+    final movieData = {
+      'id': movie.id,
+      'title': movie.titleEnglish,
+      'rating': movie.formattedRating,
+      'imageUrl': movie.largeCoverImage,
+      'year': movie.year,
+      'addedAt': FieldValue.serverTimestamp(),
+    };
+
+    // حفظ في Firestore (للمستخدمين المسجلين)
+    if (FirebaseAuth.instance.currentUser?.uid != null) {
+      await _addToFirestore('watchlist', movieData);
+    }
+
+    // حفظ في SharedPreferences كنسخة احتياطية
     final prefs = await SharedPreferences.getInstance();
     final watchlistKey = 'watchlist_$userId';
     List<String> watchlist = prefs.getStringList(watchlistKey) ?? [];
@@ -86,9 +186,16 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
     }
   }
 
-  // إزالة الفيلم من Watchlist
+  // إزالة الفيلم من Watchlist (Firestore + SharedPreferences)
   Future<void> _removeFromWatchlist(MovieDetailsEntity movie) async {
     final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+
+    // حذف من Firestore
+    if (FirebaseAuth.instance.currentUser?.uid != null) {
+      await _removeFromFirestore('watchlist', movie.id.toString());
+    }
+
+    // حذف من SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     final watchlistKey = 'watchlist_$userId';
     List<String> watchlist = prefs.getStringList(watchlistKey) ?? [];
@@ -101,6 +208,13 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
   // التحقق مما إذا كان الفيلم في Watchlist
   Future<bool> _isInWatchlist(MovieDetailsEntity movie) async {
     final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+
+    // التحقق من Firestore أولاً للمستخدمين المسجلين
+    if (FirebaseAuth.instance.currentUser?.uid != null) {
+      return await _isInWatchlistFirestore(movie.id);
+    }
+
+    // للمستخدمين الضيوف، التحقق من SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     final watchlistKey = 'watchlist_$userId';
     List<String> watchlist = prefs.getStringList(watchlistKey) ?? [];
@@ -113,7 +227,7 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
       return;
     }
 
-    // إضافة إلى History عند المشاهدة
+    // إضافة الفيلم إلى History
     await _addToHistory(movie);
 
     try {
@@ -152,14 +266,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121312),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
       body: FutureBuilder<MovieDetailsEntity>(
         future: _movieDetailsFuture,
         builder: (context, snapshot) {
@@ -230,7 +336,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
               // ==================== Hero Section ====================
               Stack(
                 children: [
-                  // Background image
                   Container(
                     width: 430,
                     height: 645,
@@ -241,7 +346,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                       ),
                     ),
                   ),
-                  // Gradient overlay
                   Container(
                     width: 430,
                     height: 645,
@@ -256,7 +360,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                       ),
                     ),
                   ),
-                  // Play button
                   Positioned(
                     left: 166,
                     top: 248,
@@ -308,7 +411,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                       ),
                     ),
                   ),
-                  // Movie title
                   Positioned(
                     bottom: 112,
                     left: 28,
@@ -327,7 +429,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  // Year
                   Positioned(
                     bottom: 60,
                     left: 15,
@@ -344,7 +445,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                       ),
                     ),
                   ),
-                  // Watch Button
                   Positioned(
                     bottom: 0,
                     left: 16,
@@ -376,30 +476,7 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                 ],
               ),
 
-              // ==================== Stats Row ====================
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildStatCard(
-                      icon: Icons.favorite,
-                      value: movie.likeCount.toString(),
-                      color: const Color(0xFFF6BD00),
-                    ),
-                    _buildStatCard(
-                      icon: Icons.access_time,
-                      value: '${movie.runtime} min',
-                      color: const Color(0xFFF6BD00),
-                    ),
-                    _buildStatCard(
-                      icon: Icons.star,
-                      value: movie.formattedRating,
-                      color: const Color(0xFFF6BD00),
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 16),
 
               // ==================== Add to Watchlist Button ====================
               Padding(
@@ -442,6 +519,33 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                       ),
                     );
                   },
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // ==================== Stats Row ====================
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildStatCard(
+                      icon: Icons.favorite,
+                      value: movie.likeCount.toString(),
+                      color: const Color(0xFFF6BD00),
+                    ),
+                    _buildStatCard(
+                      icon: Icons.access_time,
+                      value: '${movie.runtime} min',
+                      color: const Color(0xFFF6BD00),
+                    ),
+                    _buildStatCard(
+                      icon: Icons.star,
+                      value: movie.formattedRating,
+                      color: const Color(0xFFF6BD00),
+                    ),
+                  ],
                 ),
               ),
 
