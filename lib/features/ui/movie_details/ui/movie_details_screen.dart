@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../home/domain/movie_entity.dart';
 import '../../home/repository/repository_impl/movie_repository_impl.dart';
 import '../../home/data_model/data_source/movie_data_source.dart';
@@ -45,37 +47,93 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
     });
   }
 
-  Future<void> _launchMovieUrl(String url) async {
-    if (url.isEmpty) {
-      _showSnackBar('No movie URL available');
-      return;
+  // إضافة الفيلم إلى History
+  Future<void> _addToHistory(MovieDetailsEntity movie) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+    final prefs = await SharedPreferences.getInstance();
+    final historyKey = 'history_$userId';
+    List<String> history = prefs.getStringList(historyKey) ?? [];
+
+    final movieKey = '${movie.id}|||${movie.titleEnglish}|||${movie.formattedRating}|||${movie.largeCoverImage}|||${movie.year}';
+
+    // إزالة إذا كان موجوداً مسبقاً
+    history.remove(movieKey);
+    // إضافة في البداية
+    history.insert(0, movieKey);
+    // الاحتفاظ بآخر 20 فيلماً فقط
+    if (history.length > 20) {
+      history = history.take(20).toList();
     }
 
-    try {
-      final Uri uri = Uri.parse(url);
+    await prefs.setStringList(historyKey, history);
+  }
 
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
-      } else {
-        await launchUrl(
-          uri,
-          mode: LaunchMode.platformDefault,
-        );
-      }
-    } catch (e) {
-      print('Error launching URL: $e');
-      _showSnackBar('Could not open the movie link');
+  // إضافة الفيلم إلى Watchlist
+  Future<void> _addToWatchlist(MovieDetailsEntity movie) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+    final prefs = await SharedPreferences.getInstance();
+    final watchlistKey = 'watchlist_$userId';
+    List<String> watchlist = prefs.getStringList(watchlistKey) ?? [];
+
+    final movieKey = '${movie.id}|||${movie.titleEnglish}|||${movie.formattedRating}|||${movie.largeCoverImage}|||${movie.year}';
+
+    if (!watchlist.contains(movieKey)) {
+      watchlist.add(movieKey);
+      await prefs.setStringList(watchlistKey, watchlist);
+      _showSnackBar('Added to Watchlist', Colors.green);
+    } else {
+      _showSnackBar('Already in Watchlist', Colors.orange);
     }
   }
 
-  void _showSnackBar(String message) {
+  // إزالة الفيلم من Watchlist
+  Future<void> _removeFromWatchlist(MovieDetailsEntity movie) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+    final prefs = await SharedPreferences.getInstance();
+    final watchlistKey = 'watchlist_$userId';
+    List<String> watchlist = prefs.getStringList(watchlistKey) ?? [];
+
+    watchlist.removeWhere((item) => item.startsWith('${movie.id}|||'));
+    await prefs.setStringList(watchlistKey, watchlist);
+    _showSnackBar('Removed from Watchlist', Colors.red);
+  }
+
+  // التحقق مما إذا كان الفيلم في Watchlist
+  Future<bool> _isInWatchlist(MovieDetailsEntity movie) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
+    final prefs = await SharedPreferences.getInstance();
+    final watchlistKey = 'watchlist_$userId';
+    List<String> watchlist = prefs.getStringList(watchlistKey) ?? [];
+    return watchlist.any((item) => item.startsWith('${movie.id}|||'));
+  }
+
+  Future<void> _launchMovieUrl(String url, MovieDetailsEntity movie) async {
+    if (url.isEmpty) {
+      _showSnackBar('No movie URL available', Colors.red);
+      return;
+    }
+
+    // إضافة إلى History عند المشاهدة
+    await _addToHistory(movie);
+
+    try {
+      final Uri uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (e) {
+      print('Error launching URL: $e');
+      _showSnackBar('Could not open the movie link', Colors.red);
+    }
+  }
+
+  void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        backgroundColor: color,
         duration: const Duration(seconds: 2),
       ),
     );
@@ -94,6 +152,14 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121312),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: FutureBuilder<MovieDetailsEntity>(
         future: _movieDetailsFuture,
         builder: (context, snapshot) {
@@ -195,7 +261,7 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                     left: 166,
                     top: 248,
                     child: GestureDetector(
-                      onTap: () => _launchMovieUrl(movie.url),
+                      onTap: () => _launchMovieUrl(movie.url, movie),
                       child: Stack(
                         children: [
                           Container(
@@ -287,7 +353,7 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                       width: 398,
                       height: 58,
                       child: ElevatedButton(
-                        onPressed: () => _launchMovieUrl(movie.url),
+                        onPressed: () => _launchMovieUrl(movie.url, movie),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFE82626),
                           foregroundColor: Colors.white,
@@ -310,7 +376,7 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                 ],
               ),
 
-              // ==================== Stats Row (إعجابات، وقت، تقييم) ====================
+              // ==================== Stats Row ====================
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 child: Row(
@@ -321,10 +387,9 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                       value: movie.likeCount.toString(),
                       color: const Color(0xFFF6BD00),
                     ),
-                    // ✅ عرض الوقت بالدقائق
                     _buildStatCard(
                       icon: Icons.access_time,
-                      value: '${movie.runtime}',
+                      value: '${movie.runtime} min',
                       color: const Color(0xFFF6BD00),
                     ),
                     _buildStatCard(
@@ -335,6 +400,52 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                   ],
                 ),
               ),
+
+              // ==================== Add to Watchlist Button ====================
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: FutureBuilder<bool>(
+                  future: _isInWatchlist(movie),
+                  builder: (context, snapshot) {
+                    final isInWatchlist = snapshot.data ?? false;
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 45,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          if (isInWatchlist) {
+                            await _removeFromWatchlist(movie);
+                          } else {
+                            await _addToWatchlist(movie);
+                          }
+                          setState(() {});
+                        },
+                        icon: Icon(
+                          isInWatchlist ? Icons.check : Icons.add,
+                          color: const Color(0xFFF6BD00),
+                        ),
+                        label: Text(
+                          isInWatchlist ? 'In Watchlist' : 'Add to Watchlist',
+                          style: const TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFFF6BD00),
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFF6BD00)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 16),
 
               // ==================== Screenshots Section ====================
               const Padding(
@@ -635,7 +746,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
               },
             ),
           ),
-          // Gradient overlay for text
           Positioned(
             bottom: 0,
             left: 0,
@@ -654,7 +764,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
               ),
             ),
           ),
-          // Rating
           Positioned(
             top: 13,
             left: 10,
@@ -688,7 +797,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
               ),
             ),
           ),
-          // Movie info
           Positioned(
             bottom: 12,
             left: 12,
@@ -741,7 +849,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
         ),
         child: Row(
           children: [
-            // Image
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: imageUrl.isNotEmpty
@@ -767,7 +874,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
               ),
             ),
             const SizedBox(width: 16),
-            // Name and Character
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
