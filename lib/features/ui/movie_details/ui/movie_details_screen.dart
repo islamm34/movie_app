@@ -13,7 +13,6 @@ import '../data/data_source/movie_details_data_source.dart';
 import '../domain/domain_entity/movie_details_entity.dart';
 import '../repository/repository_impl/movie_details_repository_impl.dart';
 import '../usecase/get_movie_details_usecase.dart';
-
 class MovieDetailsScreen extends StatefulWidget {
   final int movieId;
 
