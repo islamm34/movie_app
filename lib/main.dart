@@ -54,7 +54,7 @@ class _MyAppState extends State<MyApp> {
       return AppRoutes.home;
     } else {
       print('User is not logged in, redirecting to login');
-      return AppRoutes.login;
+      return AppRoutes.splash;
     }
   }
 }

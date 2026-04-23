@@ -1,11 +1,9 @@
-// lib/data/movie_details/datasources/movie_details_data_source.dart
-
 import 'package:dio/dio.dart';
 import '../../../../../core/network/dio_client.dart';
 import '../../api_responsed/api_responsed.dart';
 
 class MovieDetailsDataSource {
-  final DioClient _dioClient =  DioClient();
+  final DioClient _dioClient = DioClient();
 
   Future<ApiResponsed> fetchMovieDetails(int movieId) async {
     try {

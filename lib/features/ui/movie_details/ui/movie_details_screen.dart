@@ -12,7 +12,8 @@ import '../../home/widgets/usecase/get_movies_usecase.dart';
 import '../data/data_source/movie_details_data_source.dart';
 import '../domain/domain_entity/movie_details_entity.dart';
 import '../repository/repository_impl/movie_details_repository_impl.dart';
-import '../usecase/get_movie_details_usecase.dart';
+import '../use_case/get_movie_details_use_case.dart';
+
 class MovieDetailsScreen extends StatefulWidget {
   final int movieId;
 
@@ -58,13 +59,11 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
       final docRef = _firestore.collection('users').doc(userId).collection(collectionName).doc(data['id'].toString());
 
       if (collectionName == 'watchlist') {
-        // للـ Watchlist: نضيف فقط إذا لم يكن موجود
         final doc = await docRef.get();
         if (!doc.exists) {
           await docRef.set(data);
         }
       } else {
-        // للـ History: نضيف مع تحديث الوقت
         await docRef.set(data, SetOptions(merge: true));
       }
 
@@ -119,7 +118,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
       'watchedAt': FieldValue.serverTimestamp(),
     };
 
-    // حفظ في Firestore (للمستخدمين المسجلين)
     if (userId != null) {
       try {
         await _firestore
@@ -134,7 +132,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
       }
     }
 
-    // حفظ في SharedPreferences كنسخة احتياطية (للمستخدمين الضيوف)
     final prefs = await SharedPreferences.getInstance();
     final historyKey = 'history_${userId ?? 'guest'}';
     List<String> history = prefs.getStringList(historyKey) ?? [];
@@ -164,12 +161,10 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
       'addedAt': FieldValue.serverTimestamp(),
     };
 
-    // حفظ في Firestore (للمستخدمين المسجلين)
     if (FirebaseAuth.instance.currentUser?.uid != null) {
       await _addToFirestore('watchlist', movieData);
     }
 
-    // حفظ في SharedPreferences كنسخة احتياطية
     final prefs = await SharedPreferences.getInstance();
     final watchlistKey = 'watchlist_$userId';
     List<String> watchlist = prefs.getStringList(watchlistKey) ?? [];
@@ -189,12 +184,10 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
   Future<void> _removeFromWatchlist(MovieDetailsEntity movie) async {
     final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
 
-    // حذف من Firestore
     if (FirebaseAuth.instance.currentUser?.uid != null) {
       await _removeFromFirestore('watchlist', movie.id.toString());
     }
 
-    // حذف من SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     final watchlistKey = 'watchlist_$userId';
     List<String> watchlist = prefs.getStringList(watchlistKey) ?? [];
@@ -208,12 +201,10 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
   Future<bool> _isInWatchlist(MovieDetailsEntity movie) async {
     final userId = FirebaseAuth.instance.currentUser?.uid ?? 'guest';
 
-    // التحقق من Firestore أولاً للمستخدمين المسجلين
     if (FirebaseAuth.instance.currentUser?.uid != null) {
       return await _isInWatchlistFirestore(movie.id);
     }
 
-    // للمستخدمين الضيوف، التحقق من SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     final watchlistKey = 'watchlist_$userId';
     List<String> watchlist = prefs.getStringList(watchlistKey) ?? [];
@@ -226,7 +217,6 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
       return;
     }
 
-    // إضافة الفيلم إلى History
     await _addToHistory(movie);
 
     try {
@@ -313,6 +303,10 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
           }
 
           final movie = snapshot.data!;
+
+          // ✅ طباعة رابط الصورة في الـ Console
+          print('📸 Image URL: ${movie.largeCoverImage}');
+
           return _buildContent(movie);
         },
       ),

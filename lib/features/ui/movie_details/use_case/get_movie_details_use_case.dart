@@ -1,4 +1,4 @@
-// lib/domain/movie_details/usecases/get_movie_details_usecase.dart
+// lib/domain/movie_details/usecases/get_movie_details_use_case.dart
 
 import '../domain/domain_entity/movie_details_entity.dart';
 import '../repository/movie_details_repository.dart';
